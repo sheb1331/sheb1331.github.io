@@ -10,12 +10,13 @@
     body { background-color: #f1f3f5; padding-top: 50px; }
     .scanner-box { border: 2px dashed #0d6efd; border-radius: 12px; overflow: hidden; background: #000; }
     .card-auth { max-width: 400px; margin: 0 auto; border: none; }
+    .card-admin { border-left: 5px solid #ffc107; }
   </style>
 </head>
 <body>
 
-<div class="container">
-  
+<div class="container" style="max-width: 800px;">
+
   <div id="section-login">
     <div class="card shadow-lg card-auth rounded-3">
       <div class="card-body p-4">
@@ -40,34 +41,58 @@
   </div>
 
   <div id="section-scanner" class="d-none">
-    <div class="row justify-content-center">
-      <div class="col-md-6">
-        <div class="card shadow-lg border-0 rounded-3">
-          <div class="card-body p-4 text-center">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <span class="badge bg-success py-2 px-3">Active: <span id="txt-peran">Asisten</span></span>
-              <button onclick="logout()" class="btn btn-outline-danger btn-sm">Keluar</button>
-            </div>
-            
-            <h4 class="fw-bold text-dark m-0" id="txt-nama-admin">Nama Asisten</h4>
-            <p class="text-muted small">Arahkan kamera ke QR Code mahasiswa</p>
-
-            <div id="reader" class="scanner-box mx-auto" style="width: 100%; max-width: 350px; min-height: 250px;"></div>
-            
-            <div class="mt-3">
-              <button id="btn-camera" onclick="initScanner()" class="btn btn-primary fw-bold px-4">Aktifkan Kamera</button>
-            </div>
-
-            <div class="mt-4 p-3 bg-light rounded border text-start">
-              <h6 class="fw-bold text-secondary m-0">Log Hasil Terakhir:</h6>
-              <div id="log-status" class="text-muted mt-2 fw-bold">Kamera Belum Aktif</div>
-              <p id="log-detail" class="m-0 text-secondary small mt-1"></p>
-            </div>
-
-          </div>
+    
+    <div class="card shadow-sm mb-4 card-admin">
+      <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap">
+        <div>
+          <span class="badge bg-success py-2 px-3">Active: <span id="txt-peran">Asisten</span></span>
+          <h4 class="fw-bold text-dark m-0 mt-2" id="txt-nama-admin">Nama Asisten</h4>
         </div>
+        <button onclick="logout()" class="btn btn-outline-danger btn-sm fw-bold">Keluar</button>
       </div>
     </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-dark text-white py-3">
+        <h6 class="m-0 fw-bold">Kontrol Sesi Aktif Praktikum</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold small">Mata Kuliah Berjalan</label>
+            <select id="opt-mk" class="form-select"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold small">Pertemuan Ke-</label>
+            <input type="number" id="inp-pertemuan" class="form-control" min="1" max="16">
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button onclick="updateSesiBackend()" id="btn-update-sesi" class="btn btn-warning w-100 fw-bold">Update</button>
+          </div>
+        </div>
+        <div id="alert-sesi" class="alert alert-success d-none mt-3 py-2 text-center small fw-bold">✔ Sesi aktif praktikum berhasil diperbarui di Google Sheets!</div>
+      </div>
+    </div>
+
+    <div class="card shadow-lg border-0 rounded-3">
+      <div class="card-body p-4 text-center">
+        <p class="text-muted small">Arahkan kamera ke QR Code mahasiswa</p>
+
+        <div id="reader" class="scanner-box mx-auto" style="width: 100%; max-width: 350px; min-height: 250px;"></div>
+        
+        <div class="mt-3">
+          <button id="btn-camera" onclick="initScanner()" class="btn btn-primary fw-bold px-4">Aktifkan Kamera</button>
+        </div>
+
+        <div class="mt-4 p-3 bg-light rounded border text-start">
+          <h6 class="fw-bold text-secondary m-0">Log Hasil Terakhir:</h6>
+          <div id="log-status" class="text-muted mt-2 fw-bold">Kamera Belum Aktif</div>
+          <p id="log-detail" class="m-0 text-secondary small mt-1"></p>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -93,12 +118,8 @@
     btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Memverifikasi...`;
     alertBox.classList.add('d-none');
 
-    // Kirim data ke Google Sheets via Fetch API POST
     fetch(webAppUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "text/plain" // Google Apps Script lebih stabil menerima text/plain lalu di-parse
-      },
       body: JSON.stringify({ action: "login", email: email, password: pass })
     })
     .then(res => res.json())
@@ -108,13 +129,27 @@
 
       if (data.success) {
         loggedInEmail = email;
-        // Pindah Halaman ke Scanner
+        
         document.getElementById('section-login').classList.add('d-none');
         document.getElementById('section-scanner').classList.remove('d-none');
         
-        // Pasang Nama Admin yang didapat dari database Google Sheet
         document.getElementById('txt-nama-admin').innerText = data.nama;
         document.getElementById('txt-peran').innerText = data.peran;
+
+        // FITUR BARU: Isi nilai Pertemuan Ke- dari database
+        document.getElementById('inp-pertemuan').value = data.sesi.pertemuan;
+        
+        // FITUR BARU: Pasang data Mata Kuliah ke dalam Dropdown
+        let selectMk = document.getElementById('opt-mk');
+        selectMk.innerHTML = "";
+        data.pilihan_mk.forEach(function(mk) {
+          let opt = document.createElement('option');
+          opt.value = mk.kode;
+          opt.text = mk.kode + " - " + mk.nama;
+          if(mk.kode === data.sesi.kode_mk) opt.selected = true;
+          selectMk.appendChild(opt);
+        });
+
       } else {
         alertBox.innerText = data.message;
         alertBox.classList.remove('d-none');
@@ -125,6 +160,50 @@
       btn.innerText = "Masuk Sistem";
       alertBox.innerText = "Gagal terhubung ke server. Pastikan URL Web App benar.";
       alertBox.classList.remove('d-none');
+      console.error(err);
+    });
+  }
+
+  // FITUR BARU: FUNGSI UNTUK MERUBAH MATA KULIAH & SESI AKTIF DI GOOGLE SHEETS
+  function updateSesiBackend() {
+    const webAppUrl = document.getElementById('web-app-url').value;
+    const mkSelected = document.getElementById('opt-mk').value;
+    const ptmInput = document.getElementById('inp-pertemuan').value;
+    const btn = document.getElementById('btn-update-sesi');
+    const alertBox = document.getElementById('alert-sesi');
+
+    if(!mkSelected || !ptmInput) {
+      alert("Mata kuliah dan pertemuan tidak boleh kosong!");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = "...";
+
+    fetch(webAppUrl, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "update_sesi",
+        kode_mk: mkSelected,
+        pertemuan: ptmInput
+      })
+    })
+    .then(response => response.json())
+    .then(res => {
+      btn.disabled = false;
+      btn.innerText = "Update";
+      
+      if(res.success) {
+        alertBox.classList.remove('d-none');
+        setTimeout(() => alertBox.classList.add('d-none'), 3000);
+      } else {
+        alert("Gagal memperbarui sesi: " + res.message);
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.innerText = "Update";
+      alert("Terjadi kesalahan koneksi saat memperbarui sesi.");
       console.error(err);
     });
   }
@@ -154,10 +233,10 @@
       .then(res => res.json())
       .then(response => {
         if (response.success) {
-          document.getElementById('log-status').innerHTML = `<span class="text-success">✔ BERHASIL MENCATAT</span>`;
+          document.getElementById('log-status').innerHTML = `<span class="text-success fw-bold">✔ BERHASIL MENCATAT</span>`;
           document.getElementById('log-detail').innerHTML = `<strong>Nama:</strong> ${response.nama}<br><strong>NIM:</strong> ${decodedText}<br><strong>Status:</strong> <span class="badge bg-success">${response.status}</span>`;
         } else {
-          document.getElementById('log-status').innerHTML = `<span class="text-danger">❌ GAGAL</span>`;
+          document.getElementById('log-status').innerHTML = `<span class="text-danger fw-bold">❌ GAGAL</span>`;
           document.getElementById('log-detail').innerText = response.message;
         }
         
@@ -167,18 +246,26 @@
         }, 2500);
       })
       .catch(err => {
-        document.getElementById('log-status').innerHTML = `<span class="text-danger">❌ ERROR JARINGAN</span>`;
+        document.getElementById('log-status').innerHTML = `<span class="text-danger fw-bold">❌ ERROR JARINGAN</span>`;
         setTimeout(() => html5QrcodeScanner.resume(), 3000);
       });
     };
 
     const config = { fps: 10, qrbox: { width: 220, height: 220 } };
 
-    html5QrcodeScanner.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
-      .catch(err => {
-        document.getElementById('log-status').innerText = "Gagal mengakses kamera: " + err;
-        document.getElementById('btn-camera').style.display = 'inline-block';
-      });
+    // Modifikasi deteksi otomatis kamera belakang agar optimal di HP maupun Laptop
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        let cameraId = devices[devices.length - 1].id;
+        html5QrcodeScanner.start(cameraId, config, qrCodeSuccessCallback);
+      } else {
+        html5QrcodeScanner.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+      }
+    })
+    .catch(err => {
+      document.getElementById('log-status').innerText = "Gagal mengakses kamera: " + err;
+      document.getElementById('btn-camera').style.display = 'inline-block';
+    });
   }
 
   function logout() {
