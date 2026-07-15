@@ -269,17 +269,36 @@
     
     counterText.innerText = listMhs.length;
     
+    // LOGIKA BARU: Mengelompokkan mahasiswa berdasarkan properti 'kelompok'
+    let kelompokMap = {};
     listMhs.forEach(function(mhs) {
-      let classStatus = mhs.status === "Hadir" ? 'status-hadir' : 'status-lambat';
-      let tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="text-muted fw-bold">${mhs.waktu}</td>
-        <td class="text-primary fw-bold">${mhs.nim}</td>
-        <td class="fw-semibold text-dark">${mhs.nama}</td>
-        <td><span class="${classStatus}">${mhs.status}</span></td>
-      `;
-      tbody.appendChild(tr);
+      if (!kelompokMap[mhs.kelompok]) {
+        kelompokMap[mhs.kelompok] = [];
+      }
+      kelompokMap[mhs.kelompok].push(mhs);
     });
+    
+    // Lakukan looping untuk menggambar header kelompok dan anggotanya
+    for (let namaKelompok in kelompokMap) {
+      // 1. Buat Baris Header Kelompok (Spanning 4 Kolom)
+      let trHeader = document.createElement('tr');
+      trHeader.className = "table-dark text-white fw-bold";
+      trHeader.innerHTML = `<td colspan="4" class="py-2 text-uppercase font-monospace" style="letter-spacing: 1px;">📁 ${namaKelompok} (${kelompokMap[namaKelompok].length} Mhs)</td>`;
+      tbody.appendChild(trHeader);
+      
+      // 2. Tampilkan baris mahasiswa yang masuk dalam kelompok tersebut
+      kelompokMap[namaKelompok].forEach(function(mhs) {
+        let classStatus = mhs.status === "Hadir" ? 'status-hadir' : 'status-lambat';
+        let trMhs = document.createElement('tr');
+        trMhs.innerHTML = `
+          <td class="text-muted fw-bold">${mhs.waktu}</td>
+          <td class="text-primary fw-bold">${mhs.nim}</td>
+          <td class="fw-semibold text-dark">${mhs.nama}</td>
+          <td><span class="${classStatus}">${mhs.status}</span></td>
+        `;
+        tbody.appendChild(trMhs);
+      });
+    }
   }
 
   function initScanner() {
